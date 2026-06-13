@@ -1,11 +1,10 @@
-#  SmartIntake — Production ML Powered Lead Triage System
+# SmartIntake — ML-Powered Production Lead Triage System
 
 > A full-stack, production-grade ML engineering project demonstrating the complete model lifecycle:
 > **data generation → training → serving → drift detection → auto-retraining**
 
-[![CI](https://github.com/JayanaGunaweera01/smartintake/actions/workflows/main.yml/badge.svg)](https://github.com/JayanaGunaweera01/smartintake/actions)
-
-[![Retrain](https://github.com/JayanaGunaweera01/smartintake/actions/workflows/retrain.yml/badge.svg)](https://github.com/JayanaGunaweera01/smartintake/actions)
+[![CI](https://github.com/JayanaGunaweera01/smart-intake/actions/workflows/ci.yml/badge.svg)](https://github.com/JayanaGunaweera01/smart-intake/actions)
+[![Retrain](https://github.com/JayanaGunaweera01/smart-intake/actions/workflows/retrain.yml/badge.svg)](https://github.com/JayanaGunaweera01/smart-intake/actions)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)](https://fastapi.tiangolo.com)
 [![MLflow](https://img.shields.io/badge/MLflow-2.11-blue)](https://mlflow.org)
@@ -51,18 +50,52 @@
               → train → eval gate → promote
 ```
 
+---
+
 ## Quick Start
 
+### Prerequisites
+
+- Docker 24+ and Docker Compose 2.x
+- Python 3.11
+- Node 18+ (frontend only)
+
+### Setup
+
 ```bash
-git clone https://github.com/yourusername/smartintake
-cd smartintake
+git clone https://github.com/JayanaGunaweera01/smart-intake
+cd smart-intake
 
-# One-shot setup (Docker required)
-chmod +x scripts/setup.sh
-./scripts/setup.sh
+cp .env.example .env
+# Fill in your Supabase DATABASE_URL and other values — see Environment Variables below
+```
 
-# Run dashboard
-cd frontend && npm run dev
+### Start infrastructure
+
+```bash
+docker compose up -d redis mlflow
+```
+
+### Train the model
+
+```bash
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+python -m ml.generate_synthetic --n 5000 --out ml/data/leads.parquet
+python -m ml.train --data ml/data/leads.parquet --experiment lead-scoring
+```
+
+### Start the API
+
+```bash
+uvicorn api.main:app --reload --port 8000
+```
+
+### Start the dashboard
+
+```bash
+cd frontend && npm install && npm run dev
 ```
 
 Visit:
@@ -71,10 +104,12 @@ Visit:
 - **MLflow**    → http://localhost:5000
 - **Grafana**   → http://localhost:3001 (admin / admin)
 
+---
+
 ## Project Structure
 
 ```
-smartintake/
+smart-intake/
 ├── api/
 │   ├── main.py                  # FastAPI app + middleware
 │   ├── config.py                # Pydantic settings
@@ -107,33 +142,39 @@ smartintake/
 ├── .github/workflows/
 │   ├── ci.yml                   # Test + lint + Docker build
 │   └── retrain.yml              # Auto-retrain on drift
-├── docker-compose.yml           # Full local stack
+├── docker-compose.yml           # Local stack (Redis + MLflow)
+├── Dockerfile                   # API container
+├── alembic.ini                  # Alembic config
 └── scripts/setup.sh             # One-shot setup
 ```
+
+---
 
 ## Key ML Engineering Concepts Demonstrated
 
 | Concept | Implementation |
-|---------|---------------|
+|---|---|
 | **Feature Engineering** | `feature_extractor.py` — pure functions, fully unit-tested |
 | **Model Training** | `ml/train.py` — XGBoost + SMOTE + cross-validation |
 | **Experiment Tracking** | MLflow — params, metrics, artifacts, model registry |
 | **Model Serving** | FastAPI + MLflow pyfunc — async, <50ms p99 |
 | **Explainability** | SHAP TreeExplainer — top-5 factors per prediction |
-| **Drift Detection** | Evidently PSI + KS — per-feature and dataset-level |
+| **Drift Detection** | Evidently PSI — per-feature and dataset-level |
 | **Auto-retraining** | GitHub Actions `workflow_dispatch` — gated by AUC ≥ 0.70 |
-| **Data Validation** | Pydantic v2 + great-expectations |
 | **Observability** | Prometheus metrics + Grafana dashboard |
 | **Rate Limiting** | Redis sliding window — 30 req/min per IP |
-| **Idempotency** | Redis SHA256 dedup key — 24h TTL |
+| **Idempotency** | Redis SHA-256 dedup key — 24h TTL |
 | **Champion/Challenger** | MLflow `archive_existing_versions` on promotion |
 | **Async I/O** | FastAPI + asyncpg + aioredis throughout |
-| **Docker** | Multi-stage build, non-root user, healthchecks |
+| **Containerisation** | Docker with non-root user and healthchecks |
 | **CI/CD** | GitHub Actions — lint + test + coverage + GHCR push |
+
+---
 
 ## API Reference
 
 ### Submit a lead
+
 ```http
 POST /api/v1/leads/submit
 Content-Type: application/json
@@ -149,29 +190,39 @@ Content-Type: application/json
 ```
 
 Response:
+
 ```json
 {
   "lead_id": "uuid",
   "score": 0.87,
   "tier": "hot",
   "top_factors": [
-    {"feature": "is_free_email", "shap_value": -0.42, "direction": "negative", "importance_rank": 1}
+    {
+      "feature": "is_free_email",
+      "shap_value": -0.42,
+      "direction": "negative",
+      "importance_rank": 1
+    }
   ],
   "message": "Lead received and classified as HOT (score: 87/100)"
 }
 ```
 
-### Get score + SHAP
+### Get score + SHAP explanation
+
 ```http
 GET /api/v1/leads/{lead_id}/score
 ```
 
-### Dashboard stats
+### Dashboard
+
 ```http
 GET /api/v1/dashboard/stats
 GET /api/v1/dashboard/leads?tier=hot&limit=50
 GET /api/v1/dashboard/drift
 ```
+
+---
 
 ## Testing
 
@@ -179,41 +230,100 @@ GET /api/v1/dashboard/drift
 pytest tests/ -v --cov=api --cov-report=term-missing
 ```
 
-## 🔄 MLOps Workflow
+---
+
+## MLOps Workflow
 
 ```bash
-# 1. Generate data
+# 1. Generate training data
 python -m ml.generate_synthetic --n 10000
 
-# 2. Train + register
+# 2. Train and register model
 python -m ml.train --data ml/data/leads.parquet
 
-# 3. Check drift
+# 3. Check for drift manually
 python -m monitoring.drift_monitor
 
-# 4. Retrain triggers automatically via GitHub Actions
+# 4. Auto-retrain triggers via GitHub Actions
 #    when PSI > 0.20 (configurable via DRIFT_PSI_THRESHOLD)
 ```
+
+---
 
 ## Deployment
 
 | Service | Platform |
-|---------|----------|
-| API | Fly.io / Railway / Render |
-| PostgreSQL | Supabase / Neon (free tier) |
+|---|---|
+| API | Fly.io / Railway |
+| PostgreSQL | Supabase (free tier) |
 | Redis | Upstash (free tier) |
 | MLflow | Self-hosted on Fly.io |
-| Frontend | Vercel / Netlify |
+| Frontend | Vercel |
 | Monitoring | Grafana Cloud (free tier) |
+
+---
 
 ## Environment Variables
 
-See `.env.example` for the full list. Required for production:
-- `DATABASE_URL` — PostgreSQL connection string
-- `REDIS_URL` — Redis connection string
+Copy `.env.example` to `.env` and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+```bash
+# ── Database (Supabase session-mode pooler) ───────────────────────────────────
+DATABASE_URL=postgresql+asyncpg://postgres.[PROJECT-REF]:[PASSWORD]@aws-1-[REGION].pooler.supabase.com:5432/postgres
+MLFLOW_DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-1-[REGION].pooler.supabase.com:5432/postgres
+
+# ── Redis ─────────────────────────────────────────────────────────────────────
+REDIS_URL=redis://localhost:6379
+
+# ── MLflow ────────────────────────────────────────────────────────────────────
+MLFLOW_TRACKING_URI=http://localhost:5000
+MODEL_NAME=lead-scorer
+MODEL_STAGE=Production
+
+# ── Twilio ────────────────────────────────────────────────────────────────────
+TWILIO_ENABLED=false
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_FROM_NUMBER=+15551234567
+
+# ── Scoring thresholds ────────────────────────────────────────────────────────
+HOT_THRESHOLD=0.75
+WARM_THRESHOLD=0.45
+COLD_THRESHOLD=0.20
+
+# ── Drift detection ───────────────────────────────────────────────────────────
+DRIFT_PSI_THRESHOLD=0.20
+DRIFT_WINDOW_HOURS=24
+REFERENCE_DATA_PATH=ml/data/reference.parquet
+
+# ── GitHub (for drift monitor to trigger retrain) ─────────────────────────────
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GITHUB_REPOSITORY=YourUsername/smart-intake
+
+# ── Grafana ───────────────────────────────────────────────────────────────────
+GRAFANA_PASSWORD=admin
+
+# ── Security ──────────────────────────────────────────────────────────────────
+SECRET_KEY=generate-with-python-secrets-token-hex-32
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
+CORS_ORIGINS=["http://localhost:3000","http://localhost:5173","https://your-app.vercel.app"]
+```
+
+**Required for production:**
+- `DATABASE_URL` — Supabase session-mode pooler URI
+- `MLFLOW_DATABASE_URL` — same host, plain `postgresql://` driver for MLflow
+- `REDIS_URL` — Upstash or local Redis
 - `MLFLOW_TRACKING_URI` — MLflow server URL
-- `TWILIO_*` — For SMS routing (optional, set `TWILIO_ENABLED=true`)
+- `SECRET_KEY` — generate with `python -c "import secrets; print(secrets.token_hex(32))"`
+- `TWILIO_*` — only needed if `TWILIO_ENABLED=true`
+
+---
 
 ## License
 
-Apache — build on it, learn from it, ship it.
+Apache 2.0 — build on it, learn from it, ship it.
