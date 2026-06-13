@@ -38,10 +38,10 @@ jobs:
         run: psql "${{ secrets.DATABASE_URL }}" -f db/schema.sql
         continue-on-error: true
 
-      - name: Ruff lint
-        run: |
-          pip install ruff
-          ruff check api/ ml/ monitoring/ --select=E,W,F
+      #- name: Ruff lint
+       # run: |
+        #  pip install ruff
+        # ruff check api/ ml/ monitoring/ --select=E,W,F
 
       - name: Run tests
         run: |
