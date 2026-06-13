@@ -1,16 +1,16 @@
-# ⚡ SmartIntake — Production ML-Powered Lead Triage System
+#  SmartIntake — Production ML Powered Lead Triage System
 
 > A full-stack, production-grade ML engineering project demonstrating the complete model lifecycle:
 > **data generation → training → serving → drift detection → auto-retraining**
 
-[![CI](https://github.com/yourusername/smartintake/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/smartintake/actions)
+[![CI](https://github.com/JayanaGunaweera01/smartintake/actions/workflows/ci.yml/badge.svg)](https://github.com/JayanaGunaweera01/smartintake/actions)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)](https://fastapi.tiangolo.com)
 [![MLflow](https://img.shields.io/badge/MLflow-2.11-blue)](https://mlflow.org)
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 ```
  Form Submission
@@ -49,7 +49,7 @@
               → train → eval gate → promote
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 git clone https://github.com/yourusername/smartintake
@@ -69,7 +69,7 @@ Visit:
 - **MLflow**    → http://localhost:5000
 - **Grafana**   → http://localhost:3001 (admin / admin)
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 smartintake/
@@ -109,7 +109,7 @@ smartintake/
 └── scripts/setup.sh             # One-shot setup
 ```
 
-## 🔑 Key ML Engineering Concepts Demonstrated
+## Key ML Engineering Concepts Demonstrated
 
 | Concept | Implementation |
 |---------|---------------|
@@ -129,7 +129,7 @@ smartintake/
 | **Docker** | Multi-stage build, non-root user, healthchecks |
 | **CI/CD** | GitHub Actions — lint + test + coverage + GHCR push |
 
-## 📊 API Reference
+## API Reference
 
 ### Submit a lead
 ```http
@@ -171,7 +171,7 @@ GET /api/v1/dashboard/leads?tier=hot&limit=50
 GET /api/v1/dashboard/drift
 ```
 
-## 🧪 Testing
+## Testing
 
 ```bash
 pytest tests/ -v --cov=api --cov-report=term-missing
@@ -193,7 +193,7 @@ python -m monitoring.drift_monitor
 #    when PSI > 0.20 (configurable via DRIFT_PSI_THRESHOLD)
 ```
 
-## 🌍 Deployment
+## Deployment
 
 | Service | Platform |
 |---------|----------|
@@ -204,7 +204,7 @@ python -m monitoring.drift_monitor
 | Frontend | Vercel / Netlify |
 | Monitoring | Grafana Cloud (free tier) |
 
-## 📝 Environment Variables
+## Environment Variables
 
 See `.env.example` for the full list. Required for production:
 - `DATABASE_URL` — PostgreSQL connection string
