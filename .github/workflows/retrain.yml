@@ -1,0 +1,98 @@
+name: Auto Retrain
+
+on:
+  workflow_dispatch:
+    inputs:
+      psi_score:
+        description: "Drift PSI score that triggered this run"
+        required: false
+        default: "unknown"
+  schedule:
+    - cron: "0 3 * * 0"   # Weekly Sunday 3 AM UTC regardless of drift
+
+jobs:
+  retrain:
+    name: Retrain Lead Scorer
+    runs-on: ubuntu-latest
+
+    env:
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Log trigger reason
+        run: |
+          echo "Triggered by: ${{ github.event_name }}"
+          echo "PSI score: ${{ github.event.inputs.psi_score }}"
+
+      - name: Pull latest training data from S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          mkdir -p ml/data
+          # Pull production feedback data from S3
+          aws s3 cp s3://${{ secrets.S3_BUCKET }}/training/latest.parquet ml/data/leads.parquet || \
+          # Fall back to generating synthetic data if S3 not configured
+          python -m ml.generate_synthetic --n 10000 --out ml/data/leads.parquet
+
+      - name: Run training
+        run: |
+          python -m ml.train \
+            --data ml/data/leads.parquet \
+            --experiment lead-scoring-auto-retrain
+
+      - name: Run evaluation gate
+        id: eval_gate
+        run: |
+          python - <<'EOF'
+          import mlflow, sys
+          client = mlflow.MlflowClient("${{ env.MLFLOW_TRACKING_URI }}")
+          runs = client.search_runs(
+              experiment_ids=[client.get_experiment_by_name("lead-scoring-auto-retrain").experiment_id],
+              order_by=["start_time DESC"],
+              max_results=1,
+          )
+          if not runs:
+              print("No runs found"); sys.exit(1)
+          run = runs[0]
+          auc = run.data.metrics.get("test_roc_auc", 0)
+          print(f"New model AUC: {auc:.4f}")
+          if auc < 0.70:
+              print("AUC below gate (0.70) — aborting promotion")
+              sys.exit(1)
+          print(f"Gate passed: AUC={auc:.4f}")
+          EOF
+
+      - name: Notify on failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "⚠️ SmartIntake retrain FAILED — PSI was ${{ github.event.inputs.psi_score }}. Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify on success
+        if: success()
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "✅ SmartIntake retrain COMPLETE — new model promoted to Production. PSI was ${{ github.event.inputs.psi_score }}."
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
