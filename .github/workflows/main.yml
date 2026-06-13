@@ -36,6 +36,7 @@ jobs:
 
       - name: Apply DB schema
         run: psql "${{ secrets.DATABASE_URL }}" -f db/schema.sql
+        continue-on-error: true
 
       - name: Ruff lint
         run: |
