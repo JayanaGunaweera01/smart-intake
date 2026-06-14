@@ -3,7 +3,7 @@
 > A full-stack, production-grade ML engineering project demonstrating the complete model lifecycle:
 > **data generation → training → serving → drift detection → auto-retraining**
 
-[![CI](https://github.com/JayanaGunaweera01/smart-intake/actions/workflows/ci.yml/badge.svg)](https://github.com/JayanaGunaweera01/smart-intake/actions)
+[![CI](https://github.com/JayanaGunaweera01/smart-intake/actions/workflows/main.yml/badge.svg)](https://github.com/JayanaGunaweera01/smart-intake/actions)
 [![Retrain](https://github.com/JayanaGunaweera01/smart-intake/actions/workflows/retrain.yml/badge.svg)](https://github.com/JayanaGunaweera01/smart-intake/actions)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)](https://fastapi.tiangolo.com)
